@@ -304,6 +304,7 @@ export async function fetchSeasonSchedule(): Promise<SeasonSchedule> {
       games.push({
         gamePk: g.gamePk,
         date: g.officialDate ?? g.gameDate?.slice(0, 10) ?? "",
+        gameDateTime: g.gameDate ?? null,
         gameType: g.gameType ?? "R",
         status,
         venue: g.venue?.name ?? "—",

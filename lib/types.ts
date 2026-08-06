@@ -5,6 +5,7 @@ export type GameStatus = "Final" | "Live" | "Scheduled" | "Postponed" | "Other";
 export type Game = {
   gamePk: number;
   date: string; // "2026-08-01"
+  gameDateTime: string | null; // ISO datetime（開賽時間，Scheduled 用）
   gameType: string; // 'R' 例行賽, 'P' 春訓, 'S' 季後賽...
   status: GameStatus;
   venue: string;
