@@ -17,6 +17,13 @@ import {
   fetchTeamPitchingRanks,
 } from "../lib/mlb";
 import { formatAvg, formatEra } from "../lib/formatters";
+import {
+  pythagorean,
+  projectRestOfSeason,
+  simulatePlayoffOdds,
+  scheduleDifficulty,
+  magicNumber,
+} from "../lib/analysis";
 
 async function main() {
   console.log("=== 1. 國民隊排名 ===");
@@ -97,6 +104,43 @@ async function main() {
     const v = typeof r.value === "number" && r.value < 1 ? formatEra(r.value) : r.value;
     console.log(`投手 ${r.name}: #${r.rank}/30 (${v})`);
   }
+
+  console.log("\n=== 7. 分析計算 ===");
+  // Pythagorean 合理性
+  const pyth = pythagorean(620, 606);
+  console.log(`Pythagorean(620, 606) = ${pyth.toFixed(3)}`);
+  // 季後賽機率
+  const projs = projectRestOfSeason(standings);
+  const sim = simulatePlayoffOdds(projs, 120, 10000);
+  console.log(
+    `國民隊：季後賽機率 ${(sim.playoffPct * 100).toFixed(1)}% (分區 ${(sim.divisionPct * 100).toFixed(1)}% + 外卡 ${(sim.wildCardPct * 100).toFixed(1)}%), 預計 ${sim.projectedWins} 勝 ±${sim.winsStd}`
+  );
+  console.log("前 6 隊預計勝場：");
+  for (const t of sim.projTable.slice(0, 6)) {
+    console.log(
+      `  ${t.name.padEnd(10)} ${t.projectedWins} 勝, 季後賽 ${(t.playoffPct * 100).toFixed(0)}%`
+    );
+  }
+  // 賽程難度
+  const standMap = new Map(standings.map((t) => [t.teamId, t]));
+  const sos = scheduleDifficulty(sched.remainingGames, standMap);
+  console.log(
+    `剩餘賽程難度：平均對手勝率 ${sos.avgOppWpct.toFixed(3)}, 對 >.500 隊 ${sos.vsAbove500}/${sos.totalGames} 場`
+  );
+  const hardest = sos.gamesByOpp.slice(0, 3);
+  console.log(
+    `最多對陣：${hardest.map((g) => `${g.oppName}×${g.games} (${(g.oppWpct * 100).toFixed(0)}%)`).join(", ")}`
+  );
+  // 魔術數字示例（官方值優先）
+  const natsRow = standings.find((t) => t.teamId === 120)!;
+  const eastLeader = standings.find((t) => t.divisionName.includes("East") && t.divisionRank === 1)!;
+  console.log(
+    `官方 magicNumber(國民分區龍頭) = ${natsRow.magicNumber ?? "—"}, wildCardEliminationNumber = ${natsRow.wildCardEliminationNumber ?? "—"}`
+  );
+  const eastLeaderRemaining = 162 - eastLeader.wins - eastLeader.losses;
+  console.log(
+    `fallback magicNumber = ${magicNumber(eastLeader.wins, eastLeaderRemaining, natsRow.wins)}`
+  );
 
   console.log("\n✅ 驗證完成");
 }
