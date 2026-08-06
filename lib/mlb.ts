@@ -42,7 +42,11 @@ interface MLBTeamRecord {
 }
 
 interface MLBStandingsResponse {
-  records: { division: { id: number }; teamRecords: MLBTeamRecord[] }[];
+  records: {
+    division: { id: number } | null;
+    standingsType: "regularSeason" | "wildCard" | string;
+    teamRecords: MLBTeamRecord[];
+  }[];
 }
 
 interface MLBScheduleGame {
@@ -57,7 +61,8 @@ interface MLBScheduleGame {
     home: { team: { id: number; name: string }; score: number | null; isWinner: boolean };
   };
   venue: { name: string } | null;
-  seriesSummary: { gameNumber: number; totalGames: number };
+  seriesSummary: { gameNumber: number; totalGames: number } | null;
+  seriesGameNumber?: number;
 }
 
 interface MLBScheduleResponse {
@@ -175,39 +180,56 @@ export async function fetchStandings(): Promise<StandingRow[]> {
 
   const byTeam = new Map<number, StandingRow>();
   for (const record of data.records ?? []) {
+    const isWildCard = record.standingsType === "wildCard";
     for (const tr of record.teamRecords ?? []) {
       const teamId = tr.team.id;
-      const divId = record.division?.id;
       const prev = byTeam.get(teamId);
+      const divId = record.division?.id;
+
+      // 外卡記錄（standingsType='wildCard'）只更新外卡欄位，
+      // 唔好覆寫分區/排名資料（外卡記錄嘅 division 欄位唔可靠）
+      if (isWildCard) {
+        const wcGb = tr.wildCardGamesBack;
+        byTeam.set(teamId, {
+          ...(prev ?? ({} as StandingRow)),
+          teamId,
+          name: prev?.name ?? tr.team.name,
+          wildCardGamesBack:
+            wcGb == null
+              ? prev?.wildCardGamesBack ?? null
+              : wcGb === "-"
+                ? null
+                : Number(wcGb),
+          wildCardEliminationNumber:
+            tr.wildCardEliminationNumber == null
+              ? prev?.wildCardEliminationNumber ?? null
+              : Number(tr.wildCardEliminationNumber),
+        });
+        continue;
+      }
+
       const divRank = Number(tr.divisionRank) || 99;
-      const wcGb = tr.wildCardGamesBack;
       byTeam.set(teamId, {
         teamId,
         name: tr.team.name,
-        divisionName: DIVISION_NAMES[divId] ?? `Division ${divId}`,
+        divisionName: divId != null ? DIVISION_NAMES[divId] ?? `Division ${divId}` : "—",
         leagueRank: Number(tr.leagueRank) || 99,
         divisionRank: divRank,
         wins: tr.wins ?? 0,
         losses: tr.losses ?? 0,
         winningPercentage: parsePercent(tr.winningPercentage) ?? 0,
-        gamesBack: tr.gamesBack == null ? null : Number(tr.gamesBack),
-        // wildCardGamesBack 只有喺 wildCard 那組 teamRecords 有值
-        wildCardGamesBack:
-          wcGb == null
-            ? prev?.wildCardGamesBack ?? null
-            : wcGb === "-"
-              ? null
-              : Number(wcGb),
+        gamesBack:
+          tr.gamesBack == null || tr.gamesBack === "-"
+            ? null
+            : Number(tr.gamesBack),
+        wildCardGamesBack: prev?.wildCardGamesBack ?? null,
         runDifferential: (tr.runsScored ?? 0) - (tr.runsAllowed ?? 0),
         runsScored: tr.runsScored ?? 0,
         runsAllowed: tr.runsAllowed ?? 0,
         magicNumber: tr.magicNumber == null ? null : Number(tr.magicNumber),
         eliminationNumber:
           tr.eliminationNumber == null ? null : Number(tr.eliminationNumber),
-        wildCardEliminationNumber:
-          tr.wildCardEliminationNumber == null
-            ? null
-            : Number(tr.wildCardEliminationNumber),
+        wildCardEliminationNumber: prev?.wildCardEliminationNumber ?? null,
         clinched: Boolean(tr.clinched),
         streak: {
           type: tr.streak?.type ?? null,
@@ -298,7 +320,12 @@ export async function fetchSeasonSchedule(): Promise<SeasonSchedule> {
               ? (home?.isWinner ?? false)
               : (away?.isWinner ?? false)
             : null,
-        seriesSummary: `${g.seriesSummary?.gameNumber ?? "?"}/${g.seriesSummary?.totalGames ?? "?"}`,
+        seriesSummary:
+          g.seriesSummary != null
+            ? `${g.seriesSummary.gameNumber}/${g.seriesSummary.totalGames}`
+            : g.seriesGameNumber != null
+              ? `第 ${g.seriesGameNumber} 場`
+              : "—",
       });
     }
   }
@@ -608,7 +635,12 @@ export async function fetchTeamHittingRanks(): Promise<TeamRank[]> {
   for (const [key, label] of keys) {
     const sorted = rank(rows, key);
     const natsIdx = sorted.findIndex((r) => r.teamId === NATIONALS_ID);
-    result.push({ rank: natsIdx + 1, name: `${label} (${key.toUpperCase()})`, value: rows[natsIdx][key], statKey: key });
+    result.push({
+      rank: natsIdx + 1,
+      name: `${label} (${key.toUpperCase()})`,
+      value: sorted[natsIdx][key],
+      statKey: key,
+    });
   }
   return result;
 }
@@ -645,7 +677,7 @@ export async function fetchTeamPitchingRanks(): Promise<TeamRank[]> {
     result.push({
       rank: natsIdx + 1,
       name: `${label} (${key.toUpperCase()})`,
-      value: rows[natsIdx][key],
+      value: sorted[natsIdx][key],
       statKey: key,
     });
   }
