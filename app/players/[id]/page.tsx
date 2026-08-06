@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -9,7 +10,16 @@ export const metadata: Metadata = {
   title: "球員資料",
 };
 
-export default async function PlayerPage({ params }: PageProps<"/players/[id]">) {
+// 動態路由：params 係 runtime 數據，用 Suspense 包住等 shell 可以 prerender
+export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
+  return (
+    <Suspense fallback={<p className="py-10 text-center text-zinc-400">載入中...</p>}>
+      <PlayerContent params={params} />
+    </Suspense>
+  );
+}
+
+async function PlayerContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const player = await getPlayerStats(Number(id));
   if (!player) notFound();
