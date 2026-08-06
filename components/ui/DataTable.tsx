@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export type Column<T> = {
   key: string;
@@ -31,6 +31,7 @@ export function DataTable<T>({
 }) {
   const [sortKey, setSortKey] = useState(defaultSortKey);
   const [sortDir, setSortDir] = useState(defaultSortDir);
+  const router = useRouter();
 
   const col = columns.find((c) => c.key === sortKey);
   const sorted = [...rows].sort((a, b) => {
@@ -83,8 +84,20 @@ export function DataTable<T>({
         </thead>
         <tbody>
           {sorted.map((row, i) => {
-            const rowContent = (
-              <>
+            const href = rowLink?.(row);
+            return (
+              <tr
+                key={i}
+                onClick={(e) => {
+                  // 唔好攔截行入面真正嘅 <a>（例如球員名 link）
+                  if (href && !(e.target as HTMLElement).closest("a")) {
+                    router.push(href);
+                  }
+                }}
+                className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${
+                  href ? "cursor-pointer transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50" : ""
+                }`}
+              >
                 {columns.map((c) => (
                   <td
                     key={c.key}
@@ -95,23 +108,6 @@ export function DataTable<T>({
                     {c.render ? c.render(row) : (row as Record<string, unknown>)[c.key] as React.ReactNode}
                   </td>
                 ))}
-              </>
-            );
-            const href = rowLink?.(row);
-            return (
-              <tr
-                key={i}
-                className={`border-b border-zinc-100 last:border-0 dark:border-zinc-800 ${
-                  href ? "transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50" : ""
-                }`}
-              >
-                {href ? (
-                  <Link href={href} className="contents">
-                    {rowContent}
-                  </Link>
-                ) : (
-                  rowContent
-                )}
               </tr>
             );
           })}

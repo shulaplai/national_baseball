@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { PlayerStatLine } from "@/lib/types";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { formatAvg, formatEra, formatIp, formatTwo, ipToDecimal } from "@/lib/formatters";
@@ -35,9 +36,12 @@ export function PlayersView({
     label: "球員",
     render: (row) => (
       <span className="flex items-center gap-2">
-        <span className="font-semibold text-zinc-800 hover:text-[#AB0003] dark:text-zinc-100">
+        <Link
+          href={`/players/${row.personId}`}
+          className="font-semibold text-zinc-800 hover:text-[#AB0003] hover:underline dark:text-zinc-100"
+        >
           {row.name}
-        </span>
+        </Link>
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
           {row.position}
         </span>
