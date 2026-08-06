@@ -1,9 +1,10 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPlayerStats } from "@/lib/mlb";
-import { formatAvg, formatEra, formatIp, formatTwo } from "@/lib/formatters";
+import { getPlayerStats, getPlayerInfo, playerHeadshotUrl } from "@/lib/mlb";
+import { formatAvg, formatDate, formatEra, formatIp, formatTwo } from "@/lib/formatters";
 import { Card } from "@/components/ui/Card";
 
 export const metadata: Metadata = {
@@ -21,12 +22,19 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
 
 async function PlayerContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const player = await getPlayerStats(Number(id));
+  const personId = Number(id);
+  const [player, info] = await Promise.all([
+    getPlayerStats(personId),
+    getPlayerInfo(personId),
+  ]);
   if (!player) notFound();
 
   const h = player.hitting;
   const p = player.pitching;
   const f = player.fielding;
+
+  const bats = info?.batSide === "L" ? "左" : info?.batSide === "R" ? "右" : info?.batSide === "S" ? "兩" : null;
+  const throws = info?.pitchHand === "L" ? "左" : info?.pitchHand === "R" ? "右" : null;
 
   return (
     <div className="space-y-5">
@@ -35,15 +43,35 @@ async function PlayerContent({ params }: { params: Promise<{ id: string }> }) {
       </Link>
 
       <section className="rounded-2xl bg-[#14225A] p-6 text-white shadow-md">
-        <div className="flex items-center gap-4">
-          <span className="grid h-14 w-14 place-items-center rounded-full bg-[#AB0003] text-lg font-black">
-            {player.position}
-          </span>
-          <div>
-            <h1 className="text-2xl font-black">{player.name}</h1>
-            <p className="text-sm text-white/70">
-              {player.position} · 華盛頓國民隊 · 2026 球季
-            </p>
+        <div className="flex flex-wrap items-center gap-6">
+          <Image
+            src={playerHeadshotUrl(personId)}
+            alt={player.name}
+            width={140}
+            height={140}
+            className="h-28 w-28 rounded-full border-4 border-white/20 object-cover"
+            priority
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-3xl font-black">{player.name}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
+              <span className="rounded bg-[#AB0003] px-2 py-0.5 font-bold text-white">
+                {player.position}
+              </span>
+              <span>華盛頓國民隊 · 2026 球季</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/80">
+              {info?.currentAge != null && <span>年齡 {info.currentAge}</span>}
+              {info?.height && <span>身高 {info.height}</span>}
+              {info?.weight && <span>體重 {info.weight} lb</span>}
+              {bats && <span>打 {bats}</span>}
+              {throws && <span>投 {throws}</span>}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-white/60">
+              {info?.mlbDebutDate && <span>MLB 出道：{formatDate(info.mlbDebutDate)}</span>}
+              {info?.draftYear && <span>選秀年：{info.draftYear}</span>}
+              {info?.birthDate && <span>生日：{formatDate(info.birthDate)}</span>}
+            </div>
           </div>
         </div>
       </section>

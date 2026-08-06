@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { getTeamHitting, getTeamPitching, getTeamFielding } from "@/lib/mlb";
+import { getTeamHitting, getTeamPitching } from "@/lib/mlb";
 import { PlayersView } from "@/components/players/PlayersView";
 
 export const metadata: Metadata = {
   title: "球員成績",
-  description: "華盛頓國民隊 2026 球季打擊、投手、守備成績",
+  description: "華盛頓國民隊 2026 球季打擊、投手成績",
 };
 
 export default async function PlayersPage() {
-  const [hitters, pitchers, fielders] = await Promise.all([
+  const [hitters, pitchers] = await Promise.all([
     getTeamHitting(),
     getTeamPitching(),
-    getTeamFielding(),
   ]);
 
   return (
@@ -22,7 +21,7 @@ export default async function PlayersPage() {
           2026 球季 · 點擊欄位排序 · 點擊球員睇個人頁面
         </p>
       </div>
-      <PlayersView hitters={hitters} pitchers={pitchers} fielders={fielders} />
+      <PlayersView hitters={hitters} pitchers={pitchers} />
     </div>
   );
 }

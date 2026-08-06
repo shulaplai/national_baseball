@@ -132,6 +132,21 @@ export type TeamInfo = {
   locationName: string;
 };
 
+// 球員基本資料（/people/{id}）
+export type PlayerInfo = {
+  personId: number;
+  fullName: string;
+  birthDate: string | null;
+  currentAge: number | null;
+  height: string | null; // "6' 0\""
+  weight: number | null; // lb
+  batSide: string | null; // "L" / "R" / "S"
+  pitchHand: string | null; // "R" / "L"
+  mlbDebutDate: string | null;
+  draftYear: number | null;
+  primaryPosition: string | null; // "SS"
+};
+
 // 比賽時間（用嚟顯示開賽時間）
 export type GameDateTime = {
   date: string;

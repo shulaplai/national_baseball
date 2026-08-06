@@ -25,7 +25,6 @@ export default async function AnalysisPage() {
   // 季後賽模擬
   const projs = projectRestOfSeason(standings);
   const sim = simulatePlayoffOdds(projs, NATIONALS_ID, 10000);
-  const natsProj = sim.projTable.find((t) => t.teamId === NATIONALS_ID);
 
   // 賽程難度
   const sos = scheduleDifficulty(sched.remainingGames, standMap);
@@ -35,7 +34,6 @@ export default async function AnalysisPage() {
   const wcSorted = [...nlTeams]
     .filter((t) => t.wildCardGamesBack != null)
     .sort((a, b) => (a.wildCardGamesBack ?? 999) - (b.wildCardGamesBack ?? 999));
-  const wcCutline = wcSorted[2]; // 第 3 個 = 最後一個外卡位
 
   // 分區龍頭（魔術數字用）
   const eastLeader = standings.find(

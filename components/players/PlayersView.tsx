@@ -6,7 +6,7 @@ import type { PlayerStatLine } from "@/lib/types";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { formatAvg, formatEra, formatIp, formatTwo, ipToDecimal } from "@/lib/formatters";
 
-type Tab = "hitting" | "pitching" | "fielding";
+type Tab = "hitting" | "pitching";
 
 // 位置分組
 const POS_GROUPS: Record<string, string[]> = {
@@ -20,11 +20,9 @@ const POS_GROUPS: Record<string, string[]> = {
 export function PlayersView({
   hitters,
   pitchers,
-  fielders,
 }: {
   hitters: PlayerStatLine[];
   pitchers: PlayerStatLine[];
-  fielders: PlayerStatLine[];
 }) {
   const [tab, setTab] = useState<Tab>("hitting");
   const [posFilter, setPosFilter] = useState("全部");
@@ -79,16 +77,6 @@ export function PlayersView({
     { key: "k9", label: "K/9", align: "right", tabular: true, accessor: (r) => r.pitching?.kPer9 ?? 0, render: (r) => formatTwo(r.pitching?.kPer9) },
   ];
 
-  const fieldingColumns: Column<PlayerStatLine>[] = [
-    nameCol(),
-    { key: "games", label: "出賽", align: "right", tabular: true, accessor: (r) => r.fielding?.games ?? 0 },
-    { key: "fpct", label: "守備率", align: "right", tabular: true, accessor: (r) => r.fielding?.fielding ?? 0, render: (r) => formatAvg(r.fielding?.fielding) },
-    { key: "putouts", label: "刺殺", align: "right", tabular: true, accessor: (r) => r.fielding?.putOuts ?? 0 },
-    { key: "assists", label: "助殺", align: "right", tabular: true, accessor: (r) => r.fielding?.assists ?? 0 },
-    { key: "errors", label: "失誤", align: "right", tabular: true, accessor: (r) => r.fielding?.errors ?? 0 },
-    { key: "dp", label: "雙殺", align: "right", tabular: true, accessor: (r) => r.fielding?.doublePlays ?? 0 },
-  ];
-
   const filteredHitters = useMemo(() => {
     const groups = POS_GROUPS[posFilter];
     if (!groups || groups.length === 0) return hitters;
@@ -104,7 +92,6 @@ export function PlayersView({
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "hitting", label: "打擊", count: hitters.length },
     { key: "pitching", label: "投手", count: pitchers.length },
-    { key: "fielding", label: "守備", count: fielders.length },
   ];
 
   const filters = tab === "pitching" ? ["全部", "先發", "後援"] : Object.keys(POS_GROUPS);
@@ -164,14 +151,6 @@ export function PlayersView({
           rows={filteredPitchers}
           defaultSortKey="era"
           defaultSortDir="asc"
-          rowLink={playerLink}
-        />
-      )}
-      {tab === "fielding" && (
-        <DataTable
-          columns={fieldingColumns}
-          rows={fielders}
-          defaultSortKey="games"
           rowLink={playerLink}
         />
       )}

@@ -105,7 +105,11 @@ export function DataTable<T>({
                       c.align === "right" ? "text-right" : ""
                     } ${c.tabular ? "tabular-nums" : ""} ${c.cellClassName ?? ""}`}
                   >
-                    {c.render ? c.render(row) : (row as Record<string, unknown>)[c.key] as React.ReactNode}
+                    {c.render
+                      ? c.render(row)
+                      : c.accessor
+                        ? (c.accessor(row) as React.ReactNode)
+                        : ((row as Record<string, unknown>)[c.key] as React.ReactNode)}
                   </td>
                 ))}
               </tr>

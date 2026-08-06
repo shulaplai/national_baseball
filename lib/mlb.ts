@@ -13,6 +13,7 @@ import { parsePercent } from "./formatters";
 import type {
   Game,
   GameStatus,
+  PlayerInfo,
   PlayerStatLine,
   RosterPlayer,
   StandingRow,
@@ -594,6 +595,51 @@ export async function fetchPlayerStats(personId: number): Promise<PlayerStatLine
 }
 
 // ---------------------------------------------------------------------------
+// 球員基本資料
+// ---------------------------------------------------------------------------
+
+interface MLBPersonResponse {
+  people: {
+    id: number;
+    fullName: string;
+    birthDate: string | null;
+    currentAge: number | null;
+    height: string | null;
+    weight: number | null;
+    batSide?: { code: string } | null;
+    pitchHand?: { code: string } | null;
+    mlbDebutDate: string | null;
+    draftYear: number | null;
+    primaryPosition?: { abbreviation: string } | null;
+  }[];
+}
+
+/** 球員基本資料（相片 URL 由 personId 生成） — GET /people/{id} */
+export async function fetchPlayerInfo(personId: number): Promise<PlayerInfo | null> {
+  const data = await fetchMLB<MLBPersonResponse>(`/people/${personId}`);
+  const p = data.people?.[0];
+  if (!p) return null;
+  return {
+    personId: p.id,
+    fullName: p.fullName ?? "—",
+    birthDate: p.birthDate ?? null,
+    currentAge: p.currentAge ?? null,
+    height: p.height ?? null,
+    weight: p.weight ?? null,
+    batSide: p.batSide?.code ?? null,
+    pitchHand: p.pitchHand?.code ?? null,
+    mlbDebutDate: p.mlbDebutDate ?? null,
+    draftYear: p.draftYear ?? null,
+    primaryPosition: p.primaryPosition?.abbreviation ?? null,
+  };
+}
+
+/** MLB 官方頭像 URL */
+export function playerHeadshotUrl(personId: number, size = 160): string {
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/w_${size},d_people:generic:clipart:alt:1.0,q_auto:best,f_auto/people/${personId}/headshot/silo/current`;
+}
+
+// ---------------------------------------------------------------------------
 // 團隊攻守排名（全聯盟 30 隊，自己 sort）
 // ---------------------------------------------------------------------------
 
@@ -753,6 +799,14 @@ export async function getPlayerStats(personId: number): Promise<PlayerStatLine |
   cacheLife("hours");
   cacheTag(CACHE_TAG);
   return fetchPlayerStats(personId);
+}
+
+/** 球員基本資料（快取 1 日） */
+export async function getPlayerInfo(personId: number): Promise<PlayerInfo | null> {
+  "use cache";
+  cacheLife("days");
+  cacheTag(CACHE_TAG);
+  return fetchPlayerInfo(personId);
 }
 
 /** 全聯盟打擊排名（快取 1 小時） */
