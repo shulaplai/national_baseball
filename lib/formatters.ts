@@ -75,6 +75,17 @@ export function formatIp(ip: string | null | undefined): string {
   return ip;
 }
 
+/** MLB 局數轉十進制做排序："59.1" → 59.33（.1 = 1/3），"59.2" → 59.67 */
+export function ipToDecimal(ip: string | null | undefined): number {
+  if (ip === null || ip === undefined || ip === "") return 0;
+  const m = /^(\d+)(?:\.(\d))?$/.exec(ip);
+  if (!m) return Number(ip) || 0;
+  const whole = Number(m[1]) || 0;
+  const frac = m[2] ? Number(m[2]) : 0;
+  // MLB 格式：.1 = 1/3 局, .2 = 2/3 局
+  return whole + (frac === 1 ? 1 / 3 : frac === 2 ? 2 / 3 : 0);
+}
+
 /** 數字千分位分隔 */
 export function formatInt(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
