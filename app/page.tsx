@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { getStandings, getSeasonSchedule, getTeamHittingRanks, getTeamPitchingRanks, getTeamInfo } from "@/lib/mlb";
 import { formatDate, formatShortDate, formatWinningPct, formatAvg, formatEra } from "@/lib/formatters";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { FormDots } from "@/components/schedule/FormDots";
 import { WinTrendChart, type WinTrendPoint } from "@/components/charts/WinTrendChart";
+import { NewsList } from "@/components/news/NewsList";
+import { projectRestOfSeason, simulatePlayoffOdds, magicNumber } from "@/lib/analysis";
 import { NATIONALS_ID } from "@/lib/constants";
 
 // 數據刷新時機由 lib/mlb.ts 嘅 cacheLife 控制（Cache Components 模式）
@@ -36,6 +39,20 @@ export default async function HomePage() {
   const winningPct = nats.wins + nats.losses > 0 ? nats.wins / (nats.wins + nats.losses) : 0;
   const nextGame = sched.nextGame;
 
+  // 季後賽機率模擬 + 魔術數字（同分析頁同一套計算）
+  const sim = simulatePlayoffOdds(projectRestOfSeason(standings), NATIONALS_ID, 10000);
+  const eastLeader = standings.find(
+    (t) => t.divisionName.includes("East") && t.divisionRank === 1
+  );
+  const leaderRemaining = eastLeader ? 162 - eastLeader.wins - eastLeader.losses : 0;
+  const divMagic = eastLeader
+    ? (eastLeader.magicNumber ?? magicNumber(eastLeader.wins, leaderRemaining, nats.wins))
+    : null;
+
+  // 最新戰果日期（最後一場已完賽）
+  const lastFinal =
+    finished.length > 0 ? [...finished].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
+
   return (
     <div className="space-y-6">
       {/* Hero — 戰績總覽 */}
@@ -43,11 +60,18 @@ export default async function HomePage() {
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#AB0003]/30 blur-2xl" />
         <div className="relative flex flex-wrap items-center justify-between gap-6">
           <div>
-            <p className="text-sm text-white/70">2026 球季 · {team.venue}</p>
+            <p className="text-sm text-white/70">
+              2026 球季 · {team.venue}
+              {lastFinal && (
+                <span className="ml-2 text-white/50">
+                  · 最新戰果 {formatShortDate(lastFinal.date)}
+                </span>
+              )}
+            </p>
             <h1 className="mt-1 text-3xl font-black tracking-tight">
               華盛頓國民隊 <span className="text-white/60">({team.abbreviation})</span>
             </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white/80">
+            <div className="mt-3 flex flex-wrap items-center gap-2.5 text-sm text-white/80">
               <Badge tone="neutral">
                 NL East 第 {nats.divisionRank} 位
               </Badge>
@@ -57,6 +81,23 @@ export default async function HomePage() {
               {nats.streak.type && (
                 <span>
                   連{nats.streak.type === "wins" ? "勝" : "敗"} {nats.streak.number}
+                </span>
+              )}
+              {nats.clinched && <Badge tone="win">已鎖定季後賽</Badge>}
+              <PlayoffPill pct={sim.playoffPct} />
+              {nats.divisionRank === 1 && divMagic != null && (
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-bold tabular-nums">
+                  封王魔術數字 {divMagic}
+                </span>
+              )}
+              {nats.divisionRank > 1 && nats.eliminationNumber != null && (
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-bold tabular-nums">
+                  分區淘汰 E{nats.eliminationNumber}
+                </span>
+              )}
+              {nats.wildCardEliminationNumber != null && (
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-bold tabular-nums">
+                  外卡淘汰 E{nats.wildCardEliminationNumber}
                 </span>
               )}
             </div>
@@ -86,6 +127,11 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* 最新消息（ESPN，掛咗都唔阻其他內容） */}
+      <Suspense fallback={null}>
+        <NewsList />
+      </Suspense>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* 下場比賽 */}
@@ -259,6 +305,19 @@ function RankBadge({ rank }: { rank: number }) {
   return (
     <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${color}`}>
       #{rank}
+    </span>
+  );
+}
+
+/** 季後賽機率 pill（hero 用，按機率轉色） */
+function PlayoffPill({ pct }: { pct: number }) {
+  const color =
+    pct >= 0.5 ? "bg-emerald-500 text-white"
+    : pct >= 0.1 ? "bg-amber-500 text-white"
+    : "bg-zinc-500 text-white";
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${color}`}>
+      季後賽機率 {(pct * 100).toFixed(0)}%
     </span>
   );
 }

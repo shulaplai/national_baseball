@@ -13,6 +13,8 @@ export const NAV = [
   { href: "/players", label: "球員成績" },
   { href: "/schedule", label: "賽況" },
   { href: "/analysis", label: "分析" },
+  { href: "/injuries", label: "傷兵交易" },
+  { href: "/splits", label: "進階數據" },
 ] as const;
 
 // 常見 stat 欄位中文名（打擊）

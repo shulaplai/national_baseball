@@ -18,6 +18,9 @@ export function SiteFooter() {
         <p className="text-xs">
           唔係官方網站，數據僅供參考。棒球術語保留英文（AVG、HR、ERA 等）。
         </p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          數據由 GitHub Actions 每 2 小時自動更新（revalidate MLB 快取）
+        </p>
       </div>
     </footer>
   );

@@ -13,11 +13,14 @@ import { parsePercent } from "./formatters";
 import type {
   Game,
   GameStatus,
+  InjuryReportItem,
   PlayerInfo,
   PlayerStatLine,
   RosterPlayer,
+  SituationSplit,
   StandingRow,
   TeamInfo,
+  TransactionItem,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -104,6 +107,9 @@ interface MLBStat {
   chances?: number;
   fielding?: string;
   doublePlays?: number;
+  // statSplits（person-level）用
+  situationCode?: string;
+  situationDescription?: string;
 }
 
 interface MLBStatsSplit {
@@ -121,8 +127,16 @@ interface MLBRosterResponse {
   roster: {
     person: { id: number; fullName: string };
     position: { abbreviation: string; type: string };
-    status: { description: string };
+    status: { description: string; code?: string };
     jerseyNumber: string;
+  }[];
+}
+
+interface MLBTransactionsResponse {
+  transactions: {
+    date: string;
+    typeDesc: string;
+    description: string;
   }[];
 }
 
@@ -411,6 +425,107 @@ export async function fetchRoster(): Promise<RosterPlayer[]> {
     status: r.status?.description ?? "Active",
     jerseyNumber: r.jerseyNumber ?? "",
   }));
+}
+
+// ---------------------------------------------------------------------------
+// 傷兵報告 — 40-man 名單嘅受傷狀態（D10/D15/D60）
+// ---------------------------------------------------------------------------
+
+/** MLB status code → IL 分類 */
+const IL_CODE_MAP: Record<string, InjuryReportItem["ilCode"]> = {
+  D10: "IL10",
+  D15: "IL15",
+  D60: "IL60",
+};
+
+/** 40-man 名單傷兵 — GET /teams/120/roster?season=2026&rosterType=40Man */
+export async function fetchInjuryReport(): Promise<InjuryReportItem[]> {
+  const data = await fetchMLB<MLBRosterResponse>(
+    `/teams/${NATIONALS_ID}/roster?season=${SEASON}&rosterType=40Man`
+  );
+  const out: InjuryReportItem[] = [];
+  for (const r of data.roster ?? []) {
+    const il = r.status?.code ? IL_CODE_MAP[r.status.code] : undefined;
+    if (!il) continue;
+    out.push({
+      personId: r.person?.id ?? 0,
+      name: r.person?.fullName ?? "—",
+      position: r.position?.abbreviation ?? "—",
+      jerseyNumber: r.jerseyNumber ?? "",
+      ilCode: il,
+      status: r.status?.description ?? "Injured List",
+    });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// 交易 / 異動
+// ---------------------------------------------------------------------------
+
+/** 球迷關心嘅交易類型（排除號碼更改、minor league 噪音） */
+const TRANSACTION_TYPE_ALLOWLIST = new Set([
+  "Status Change",
+  "Recalled",
+  "Optioned",
+  "Designated for Assignment",
+  "Claimed Off Waivers",
+  "Released",
+  "Trade",
+  "Signed",
+]);
+
+/**
+ * 近期重要交易 — GET /transactions?teamId=120&season=2026
+ * 全季拉返嚟喺 code 度 sort + filter（唔做日期運算，避開 prerender 嘅 Date.now() 限制）。
+ */
+export async function fetchRecentTransactions(limit = 15): Promise<TransactionItem[]> {
+  const data = await fetchMLB<MLBTransactionsResponse>(
+    `/transactions?teamId=${NATIONALS_ID}&season=${SEASON}`
+  );
+  return (data.transactions ?? [])
+    .filter(
+      (t) =>
+        TRANSACTION_TYPE_ALLOWLIST.has(t.typeDesc) &&
+        !/minor league/i.test(t.description ?? "")
+    )
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
+    .slice(0, limit)
+    .map((t) => ({
+      date: t.date ?? "",
+      type: t.typeDesc,
+      description: t.description ?? "",
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// 情境 splits（主客場 / 得點圈有人）— person-level statSplits
+// ---------------------------------------------------------------------------
+
+/**
+ * 單一球員情境數據 — GET /people/{id}/stats?stats=statSplits&group=hitting&sitCodes={code}
+ * 注意：sitCodes 喺 team-level 會被忽略；得 person-level + statSplits 先有效。
+ * 實測支援嘅 code：h（主場）、a（作客）、risp（得點圈有人）。
+ */
+export async function fetchPlayerSplits(
+  personId: number,
+  sitCode: string
+): Promise<SituationSplit | null> {
+  const data = await fetchMLB<MLBStatsResponse>(
+    `/people/${personId}/stats?stats=statSplits&group=hitting&season=${SEASON}&sitCodes=${sitCode}&sportId=1&gameType=R`
+  );
+  const st = data.stats?.[0]?.splits?.[0]?.stat;
+  if (!st) return null;
+  return {
+    situationCode: st.situationCode ?? null,
+    situationDescription: st.situationDescription ?? null,
+    plateAppearances: Number(st.plateAppearances) || 0,
+    avg: parsePercent(st.avg) ?? 0,
+    obp: parsePercent(st.obp) ?? 0,
+    slg: parsePercent(st.slg) ?? 0,
+    ops: parsePercent(st.ops) ?? 0,
+    homeRuns: Number(st.homeRuns) || 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -823,4 +938,43 @@ export async function getTeamPitchingRanks(): Promise<TeamRank[]> {
   cacheLife("hours");
   cacheTag(CACHE_TAG);
   return fetchTeamPitchingRanks();
+}
+
+/** 傷兵報告（快取 1 小時，失敗兜底空陣列） */
+export async function getInjuryReport(): Promise<InjuryReportItem[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAG);
+  try {
+    return await fetchInjuryReport();
+  } catch {
+    return [];
+  }
+}
+
+/** 近期交易（快取 1 小時，失敗兜底空陣列） */
+export async function getRecentTransactions(): Promise<TransactionItem[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAG);
+  try {
+    return await fetchRecentTransactions();
+  } catch {
+    return [];
+  }
+}
+
+/** 單一球員情境 splits（快取 1 小時，失敗兜底 null） */
+export async function getPlayerSplits(
+  personId: number,
+  sitCode: string
+): Promise<SituationSplit | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAG);
+  try {
+    return await fetchPlayerSplits(personId, sitCode);
+  } catch {
+    return null;
+  }
 }

@@ -2,10 +2,10 @@ name: Revalidate MLB Data
 
 # 定時觸發 /api/revalidate，令賽果/排名數據保持最新。
 # Vercel Hobby 免費層冇 cron，所以用 GitHub Actions 免費額度。
-# 賽季期間每 15 分鐘一次；休季可以停咗呢個 workflow（或改長間隔）。
+# 每 2 小時一次（避免同 MLB API 高峰重疊，用 :17 唔用 :00）。
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch:
 
 jobs:

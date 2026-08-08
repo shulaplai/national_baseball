@@ -15,7 +15,11 @@ import {
   fetchTeamPitching,
   fetchTeamHittingRanks,
   fetchTeamPitchingRanks,
+  fetchInjuryReport,
+  fetchRecentTransactions,
+  fetchPlayerSplits,
 } from "../lib/mlb";
+import { fetchNews } from "../lib/news";
 import { formatAvg, formatEra } from "../lib/formatters";
 import {
   pythagorean,
@@ -141,6 +145,37 @@ async function main() {
   console.log(
     `fallback magicNumber = ${magicNumber(eastLeader.wins, eastLeaderRemaining, natsRow.wins)}`
   );
+
+  console.log("\n=== 8. 新增數據源（新聞 / 傷兵 / 交易 / splits） ===");
+  const news = await fetchNews();
+  console.log(`最新消息 (ESPN): ${news.length} 條`);
+  for (const n of news.slice(0, 3)) console.log(`  - ${n.headline.slice(0, 64)}`);
+
+  const injuries = await fetchInjuryReport();
+  console.log(`傷兵報告: ${injuries.length} 名`);
+  for (const p of injuries.slice(0, 5))
+    console.log(`  - ${p.name} (${p.position} #${p.jerseyNumber}, ${p.ilCode}, ${p.status})`);
+
+  const tx = await fetchRecentTransactions();
+  console.log(`近期交易: ${tx.length} 條`);
+  for (const t of tx.slice(0, 3))
+    console.log(`  - ${t.date} | ${t.type} | ${t.description.slice(0, 60)}`);
+
+  const topHitter = [...hitters].sort(
+    (a, b) => (b.hitting?.plateAppearances ?? 0) - (a.hitting?.plateAppearances ?? 0)
+  )[0];
+  if (topHitter) {
+    const [sh, sa, sr] = await Promise.all([
+      fetchPlayerSplits(topHitter.personId, "h"),
+      fetchPlayerSplits(topHitter.personId, "a"),
+      fetchPlayerSplits(topHitter.personId, "risp"),
+    ]);
+    console.log(
+      `${topHitter.name} splits: 主場 ${sh ? `${formatAvg(sh.avg)} (${sh.plateAppearances} PA)` : "—"} / ` +
+        `作客 ${sa ? `${formatAvg(sa.avg)} (${sa.plateAppearances} PA)` : "—"} / ` +
+        `RISP ${sr ? `${formatAvg(sr.avg)} (${sr.plateAppearances} PA)` : "—"}`
+    );
+  }
 
   console.log("\n✅ 驗證完成");
 }

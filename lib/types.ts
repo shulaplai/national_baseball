@@ -152,3 +152,32 @@ export type GameDateTime = {
   date: string;
   time: string; // "7:05 PM"
 };
+
+// 傷兵報告（40-man 名單傷兵狀態）
+export type InjuryReportItem = {
+  personId: number;
+  name: string;
+  position: string; // "P", "1B"...
+  jerseyNumber: string;
+  ilCode: "IL10" | "IL15" | "IL60";
+  status: string; // "Injured 15-Day"
+};
+
+// 交易 / 異動
+export type TransactionItem = {
+  date: string; // "2026-08-01"
+  type: string;
+  description: string;
+};
+
+// 情境 splits（主客場 / 得點圈有人）— person-level statSplits
+export type SituationSplit = {
+  situationCode: string | null;
+  situationDescription: string | null;
+  plateAppearances: number;
+  avg: number;
+  obp: number;
+  slg: number;
+  ops: number;
+  homeRuns: number;
+};
